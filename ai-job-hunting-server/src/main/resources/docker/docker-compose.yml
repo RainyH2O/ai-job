@@ -1,11 +1,32 @@
 version: "3"
+name: ai-job
 
 services:
   ai-job:
     container_name: "ai-job"
     image: "ai-job:1.0"
+    build:
+      context: ../../../..
+      dockerfile: src/main/resources/docker/Dockerfile
     networks:
       - data_smart_course
+    depends_on:
+      mysql:
+        condition: service_healthy
+    pre_start:
+      - image: "mysql:8.0"
+        entrypoint: ["bash", "/init.sh"]
+        command: []
+        privileged: false
+        environment:
+          - KIMI_API_KEY=
+          - MYSQL_HOST=mysql
+          - MYSQL_DATABASE=ai_job
+          - MYSQL_USER=${MYSQL_USER:-ai_job}
+          - MYSQL_PWD=${MYSQL_PASSWORD:-ai_job_local}
+        volumes: !override
+          - ./init.sh:/init.sh:ro
+          - ./init.d:/init.d:ro
     ports:
       - "9100:9100"
       - "6768:6768"
@@ -15,15 +36,49 @@ services:
     command: '/app/ai-job.jar --smart.config.webui.port=6768 --smart.config.desc.infer=true'
     privileged: true
 
-    # 如果使用docker部署，并使用默认properties文件，请指定mysql.host环境变量
+    # 覆盖默认properties中的数据库配置，与下方MySQL服务保持一致
     environment:
       - TZ=Asia/Shanghai
+      - KIMI_API_KEY=${KIMI_API_KEY:-}
+      - MYSQL_HOST=mysql
+      - SPRING_DATASOURCE_USERNAME=${MYSQL_USER:-ai_job}
+      - SPRING_DATASOURCE_PASSWORD=${MYSQL_PASSWORD:-ai_job_local}
+
+  mysql:
+    image: "mysql:8.0"
+    restart: unless-stopped
+    ports:
+      - target: 3306
+        published: "${MYSQL_PORT:-3306}"
+        host_ip: "127.0.0.1"
+    networks:
+      - data_smart_course
+    # 兼容项目当前使用的mysql-connector-java 5.1驱动
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      - TZ=Asia/Shanghai
+      - MYSQL_DATABASE=ai_job
+      - MYSQL_USER=${MYSQL_USER:-ai_job}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-ai_job_local}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-ai_job_root_local}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysql --protocol=TCP -h127.0.0.1 -u\"$${MYSQL_USER}\" -p\"$${MYSQL_PASSWORD}\" \"$${MYSQL_DATABASE}\" -e 'SELECT 1' >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
 
 
-# 我这里已经存在这个网络了
+# Compose自动创建后端与数据库共用的网络
 networks:
   data_smart_course:
-    external: true
+    driver: bridge
+
+volumes:
+  mysql_data:
 
 
 
