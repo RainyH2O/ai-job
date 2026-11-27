@@ -226,7 +226,22 @@ setReceiveInterceptor((data) => {
     if (!fromUid) {
         return data;
     }
-    if (Tools.window._PAGE.uid === fromUid) {
+    const pageUid = Tools.window._PAGE.uid;
+    const rawToUid = wsData.messages[0].to?.uid;
+    const diagnosticInfo = [
+        "transport=websocket_receive",
+        `pageUidType=${typeof pageUid}`,
+        `senderUidType=${typeof fromUid}`,
+        `wireSenderUidType=${typeof wsData.messages[0].from.uid}`,
+        `recipientUidType=${typeof rawToUid}`,
+        `strictSelfMatch=${pageUid === fromUid}`,
+        `canonicalSelfMatch=${pageUid != null && String(pageUid) === String(fromUid)}`,
+        `recipientSelfMatch=${pageUid != null && rawToUid != null && String(pageUid) === String(normalizeNumber(rawToUid))}`,
+        `protocolType=${wsData.type ?? "unknown"}`,
+        `messageType=${wsData.messages[0].type ?? "unknown"}`,
+        `bodyType=${wsData.messages[0].body?.type ?? "unknown"}`
+    ].join(";");
+    if (pageUid === fromUid) {
         logger.debug("接收到自己的消息='" + msgBody + "'")
         return data;
     }
@@ -242,7 +257,7 @@ setReceiveInterceptor((data) => {
     }
 
     let bossOption: BossOption = new BossOption()
-    bossOption.handlerBossMessage(wsData, fromUid, msgBody).then();
+    bossOption.handlerBossMessage(wsData, fromUid, msgBody, diagnosticInfo).then();
     return data;
 });
 

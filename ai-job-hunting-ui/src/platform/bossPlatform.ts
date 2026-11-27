@@ -7,6 +7,7 @@ import logger from "../logging";
 import {LogRecorder} from "../logging/record";
 import {BossOperationTypeEnum, JobSeekerClonedAnswerTypeEnum} from "../stores/types";
 import {AiPower} from "./aiPower";
+import {showReplyReview} from "./replyReview";
 import {ElMessage} from "../utils/tools";
 import {ElNotification} from "element-plus";
 
@@ -246,7 +247,7 @@ export class BossOption {
             .replace(/{{assistant_avatar}}/g, BossOption.aiIconWebpBase64)
     }
 
-    public async handlerBossMessage(msgObj: TechwolfChatProtocol, bossId: number, text: string): Promise<void> {
+    public async handlerBossMessage(msgObj: TechwolfChatProtocol, bossId: number, text: string, diagnosticInfo?: string): Promise<void> {
         if (userStore.user.preference.drE && userStore.user.preference.dr > 0) {
             // 延迟回复
             await Tools.sleep(userStore.user.preference.dr * 1000 + Tools.getRandomNumber(0, 300))
@@ -285,7 +286,7 @@ export class BossOption {
         logger.debug("接收消息解码内容：", text)
 
         const jobKey = BossOption.buildJobKey(bossUserInfo);
-        return AiPower.ask(text, jobKey, bossUserInfo).then(resp => {
+        return AiPower.ask(text, jobKey, bossUserInfo, diagnosticInfo).then(resp => {
             let data = resp.data.data;
             let answerTypeList: Number[] = data?.answerTypeList;
 
@@ -304,8 +305,15 @@ export class BossOption {
                 return Promise.resolve();
             }
 
+            if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.REVIEW_REQUIRED)) {
+                showReplyReview(msgObj.messages[0]?.from?.name || '招聘联系人', text, data.answerContent || '', reply => {
+                    this.sendMsg(bossId, reply + Tools.getEndChar(), undefined, undefined);
+                });
+                return;
+            }
+
             // 文本回复
-            if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.MSG_TEXT)) {
+            if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.MSG_TEXT) && data.answerContent?.trim()) {
                 const html = this.buildNoticeHtml(msgObj.messages[0]?.from?.name, msgObj.messages[0]?.from?.avatar, text, data.answerContent)
                 this.sendMsg(bossId, data.answerContent + Tools.getEndChar(), undefined, html)
             }

@@ -21,6 +21,8 @@ public enum AIResultCommandEnum {
     NULL,
     HR_REJECT(1, "COMMAND_HR_REJECT"),
     SEND_RESUME(2, "COMMAND_SEND_RESUME"),
+    NO_REPLY(3, "COMMAND_NO_REPLY"),
+    REVIEW_REPLY(4, "COMMAND_REVIEW_REPLY"),
     ;
 
 

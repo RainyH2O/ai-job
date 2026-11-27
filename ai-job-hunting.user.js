@@ -1,13 +1,13 @@
 // ==UserScript==
 // @name         AI工作猎手-让ai帮您找工作！
 // @namespace    https://github.com/yangfeng20
-// @version      0.0.26-beta
+// @version      0.0.27-beta
 // @author       maple.
 // @description  找工作，用AI工作猎手！让AI帮您找工作！ai坐席：【DeepSeek+ChatGpt】赋能，ai助理作为您的求职者分身24小时 * 7在线找工作，并结合您的简历信息定制化回复。批量投递，自动发送简历，交换联系方式。hr拒绝挽留。高意向邮件通知，让您不错过每一份工作机会。BOSS直聘
 // @license      Apache License 2.0
-// @icon         https://gitee.com/yangfeng20/ai-job/raw/master/file/icon.png
-// @downloadURL  https://gitee.com/yangfeng20/ai-job/raw/master/ai-job-hunting.user.js
-// @updateURL    https://gitee.com/yangfeng20/ai-job/raw/master/ai-job-hunting.user.js
+// @icon         https://raw.githubusercontent.com/RainyH2O/ai-job/custom/file/icon.png
+// @downloadURL  https://raw.githubusercontent.com/RainyH2O/ai-job/custom/ai-job-hunting.user.js
+// @updateURL    https://raw.githubusercontent.com/RainyH2O/ai-job/custom/ai-job-hunting.user.js
 // @match        https://www.zhipin.com/web/geek/*
 // @match        https://www.zhipin.com/overseas/*
 // @require      https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js
@@ -55,6 +55,7 @@ System.register("./__entry.js", ['./__monkey.entry-AXLyDKa3.js'], (function (exp
 
 System.register("./__monkey.entry-AXLyDKa3.js", ['vue', 'pinia', 'element-plus', 'protobufjs', 'event-source-polyfill'], (function (exports, module) {
   'use strict';
+  var ElMessageBox;
   var ref, reactive, computed$1, defineComponent, openBlock, createElementBlock, mergeProps, unref, renderSlot, useAttrs$1, useSlots, shallowRef, watch, nextTick, onMounted, toRef, createCommentVNode, Fragment, normalizeClass, createElementVNode, createBlock, withCtx, resolveDynamicComponent, withModifiers, createVNode, toDisplayString, normalizeStyle, provide, onUpdated, inject, onBeforeUnmount, withDirectives, cloneVNode, Text$1, Comment, Teleport, Transition, vShow, readonly, onDeactivated, isRef, vModelCheckbox, createTextVNode, toRefs, h$1, createSlots, markRaw, effectScope, renderList, getCurrentInstance, onUnmounted, onBeforeMount, createApp, warn, watchEffect, getCurrentScope, onScopeDispose, toRaw$1, resolveComponent, resolveDirective, render, isVNode, pushScopeId, popScopeId, defineStore, createPinia, ElMessage$1, ElementPlus, ElNotification, protobuf, EventSourcePolyfillDefault;
   return {
     setters: [module => {
@@ -129,6 +130,7 @@ System.register("./__monkey.entry-AXLyDKa3.js", ['vue', 'pinia', 'element-plus',
       ElMessage$1 = module.ElMessage;
       ElementPlus = module.default;
       ElNotification = module.ElNotification;
+      ElMessageBox = module.ElMessageBox;
     }, module => {
       protobuf = module.default;
     }, module => {
@@ -20071,11 +20073,46 @@ System.register("./__monkey.entry-AXLyDKa3.js", ['vue', 'pinia', 'element-plus',
         }
         return 0;
       }
+      function showReplyReview(contactName, question, draft, onConfirm) {
+        let reviewing = false;
+        let sent = false;
+        const notice = ElNotification({
+          type: "warning",
+          title: "待人工审阅",
+          duration: 0,
+          message: `${contactName}：${question}\n点击此提醒审阅并回复。`,
+          onClick: async () => {
+            if (reviewing || sent) return;
+            reviewing = true;
+            try {
+              const {value} = await ElMessageBox.prompt(question, `审阅后回复 · ${contactName}`, {
+                inputType: "textarea",
+                inputValue: draft,
+                inputPlaceholder: "核对后填写或修改回复内容",
+                inputValidator: value => !!value?.trim() || "回复不能为空",
+                confirmButtonText: "发送",
+                cancelButtonText: "暂不发送",
+                closeOnClickModal: false
+              });
+              sent = true;
+              notice.close();
+              onConfirm(value.trim());
+            } catch (action) {
+              if (action !== "cancel" && action !== "close") {
+                logger$1.error("人工审阅回复失败", action);
+              }
+            } finally {
+              reviewing = false;
+            }
+          }
+        });
+      }
       var JobSeekerClonedAnswerTypeEnum = /* @__PURE__ */ ((JobSeekerClonedAnswerTypeEnum2) => {
         JobSeekerClonedAnswerTypeEnum2[JobSeekerClonedAnswerTypeEnum2["MSG_TEXT"] = 1] = "MSG_TEXT";
         JobSeekerClonedAnswerTypeEnum2[JobSeekerClonedAnswerTypeEnum2["BOSS_OPERATION"] = 2] = "BOSS_OPERATION";
         JobSeekerClonedAnswerTypeEnum2[JobSeekerClonedAnswerTypeEnum2["STOP"] = 3] = "STOP";
         JobSeekerClonedAnswerTypeEnum2[JobSeekerClonedAnswerTypeEnum2["AI_SERVICE_EXCEPTION"] = 4] = "AI_SERVICE_EXCEPTION";
+        JobSeekerClonedAnswerTypeEnum2[JobSeekerClonedAnswerTypeEnum2["REVIEW_REQUIRED"] = 5] = "REVIEW_REQUIRED";
         return JobSeekerClonedAnswerTypeEnum2;
       })(JobSeekerClonedAnswerTypeEnum || {});
       var BossOperationTypeEnum = /* @__PURE__ */ ((BossOperationTypeEnum2) => {
@@ -20215,7 +20252,13 @@ System.register("./__monkey.entry-AXLyDKa3.js", ['vue', 'pinia', 'element-plus',
               });
               return Promise.resolve();
             }
-            if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.MSG_TEXT)) {
+            if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.REVIEW_REQUIRED)) {
+              showReplyReview(msgObj.messages[0]?.from?.name || "招聘联系人", text, data.answerContent || "", reply => {
+                this.sendMsg(bossId, reply + Tools.getEndChar(), void 0, void 0);
+              });
+              return;
+            }
+            if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.MSG_TEXT) && data.answerContent?.trim()) {
               const html = this.buildNoticeHtml((_b = (_a2 = msgObj.messages[0]) == null ? void 0 : _a2.from) == null ? void 0 : _b.name, (_d = (_c = msgObj.messages[0]) == null ? void 0 : _c.from) == null ? void 0 : _d.avatar, text, data.answerContent);
               this.sendMsg(bossId, data.answerContent + Tools.getEndChar(), void 0, html);
             }
@@ -34853,6 +34896,8 @@ System.register("./BossJobList-BCEH-zzS-Cx2c4d5o.js", ['vue', './__monkey.entry-
               return "不回复当前消息";
             if (t === 4)
               return "AI服务异常";
+            if (t === 5)
+              return "待人工审阅";
             return String(t);
           };
           const mapOperationType = (t) => {

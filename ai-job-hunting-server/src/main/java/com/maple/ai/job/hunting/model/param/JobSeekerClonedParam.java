@@ -33,4 +33,13 @@ public class JobSeekerClonedParam {
      */
     private JSONObject jobInfo;
 
+    @Size(max = 256, message = "诊断信息过长")
+    private String diagnosticInfo;
+
+    public JobSeekerClonedParam(String question, String jobKey, JSONObject jobInfo) {
+        this.question = question;
+        this.jobKey = jobKey;
+        this.jobInfo = jobInfo;
+    }
+
 }

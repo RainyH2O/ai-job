@@ -175,6 +175,7 @@ export enum JobSeekerClonedAnswerTypeEnum {
     BOSS_OPERATION = 2,
     STOP = 3,
     AI_SERVICE_EXCEPTION = 4,
+    REVIEW_REQUIRED = 5,
 
 }
 

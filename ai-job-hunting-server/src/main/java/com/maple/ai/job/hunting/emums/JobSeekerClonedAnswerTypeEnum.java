@@ -23,6 +23,7 @@ public enum JobSeekerClonedAnswerTypeEnum {
     BOSS_OPERATION(2, "boss操作"),
     STOP(3, "会话停止"),
     AI_SERVICE_EXCEPTION(4, "AI服务异常"),
+    REVIEW_REQUIRED(5, "待人工审阅"),
     ;
 
 

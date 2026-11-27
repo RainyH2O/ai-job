@@ -97,7 +97,22 @@ public class JobSeekerClonedService {
         }
 
         String answer = sessionChat.getAnswer();
-        log.info("ai回复 sessionId:{} jobKey:{} userId:{} question:{} answer:{}", sessionId, jobKey, userId, jobSeekerClonedParam.getQuestion(), answer);
+        String diagnosticInfo = jobSeekerClonedParam.getDiagnosticInfo();
+        diagnosticInfo = diagnosticInfo == null ? "missing" : diagnosticInfo.replaceAll("[^A-Za-z0-9_;=-]", "");
+        log.info("ai回复 sessionId:{} jobKey:{} userId:{} diagnosticInfo:{} question:{} answer:{}", sessionId, jobKey, userId, diagnosticInfo, jobSeekerClonedParam.getQuestion(), answer);
+
+        // 只跳过当前消息，不停止整个会话
+        if (StringUtils.isBlank(answer) || AIResultCommandEnum.NO_REPLY.getDesc().equals(StringUtils.strip(answer))) {
+            return new JobSeekerClonedResultVO(JobSeekerClonedAnswerTypeEnum.STOP, "");
+        }
+
+        String reviewCommand = AIResultCommandEnum.REVIEW_REPLY.getDesc();
+        String reviewAnswer = StringUtils.strip(answer);
+        if (reviewAnswer.startsWith(reviewCommand) && (reviewAnswer.length() == reviewCommand.length()
+                || Character.isWhitespace(reviewAnswer.charAt(reviewCommand.length())))) {
+            return new JobSeekerClonedResultVO(JobSeekerClonedAnswerTypeEnum.REVIEW_REQUIRED,
+                    StringUtils.strip(reviewAnswer.substring(reviewCommand.length())));
+        }
 
         Optional<PreferenceEntity> preferenceEntityOpt = userInfoMapper.selectPreferenceOptByUserId(userId);
         log.info("偏好设置 sessionId:{} jobKey:{} userId:{} preferenceEntityOpt:{}", sessionId, jobKey, userId, preferenceEntityOpt);

@@ -590,6 +590,7 @@ const mapAnswerType = (t: number) => {
     if (t === 2) return 'BOSS操作'
     if (t === 3) return '不回复当前消息'
     if (t === 4) return 'AI服务异常'
+    if (t === 5) return '待人工审阅'
     return String(t)
 }
 

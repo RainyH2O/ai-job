@@ -9,7 +9,7 @@
 ## 安装使用
 - [greasyfork搜索:(AI工作猎手)](https://greasyfork.org/zh-CN/scripts/527733)
 - 或者下载项目中的`ai-job-hunting.user.js`文件，通过油猴本地脚本导入。
-- 或者打开浏览器输入地址油猴自动安装：[https://gitee.com/yangfeng20/ai-job/raw/master/ai-job-hunting.user.js](https://gitee.com/yangfeng20/ai-job/raw/master/ai-job-hunting.user.js)
+- 或者打开浏览器输入地址油猴自动安装：[安装 custom 分支脚本](https://raw.githubusercontent.com/RainyH2O/ai-job/custom/ai-job-hunting.user.js)
 - 记得打开浏览器的开发者模式，新版本油猴需要打开开发者模式才能运行脚本。
 - Boss首页没有功能面板，要在工作列表页面才有功能面板：[https://www.zhipin.com/web/geek/job](https://www.zhipin.com/web/geek/job)
 
