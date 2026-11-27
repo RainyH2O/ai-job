@@ -3,11 +3,12 @@ import axios from "../axios";
 
 export class AiPower {
 
-    public static async ask(question: string, jobKey: string, bossUserInfo: any, diagnosticInfo?: string): Promise<any> {
+    public static async ask(question: string, jobKey: string, bossUserInfo: any, diagnosticInfo?: string, manualReply = false): Promise<any> {
         return axios.post("/api/job/seeker/cloned/ask", {
                 question: question,
                 jobKey: jobKey,
                 diagnosticInfo: diagnosticInfo,
+                manualReply: manualReply,
                 jobInfo: {
                     // 完整的title需要调用getBossData接口获取，代价较大; 这暂时用jobTitle代替
                     jobTitle: bossUserInfo.jobTitle,

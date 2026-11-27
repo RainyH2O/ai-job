@@ -6,6 +6,7 @@ import {TechwolfChatProtocol, protoDefinition} from "./protobuf";
 import {AiPower} from "../platform/aiPower";
 import {LogRecorder} from "../logging/record";
 import {UserStore} from "../stores";
+import {manualReplyMode} from "../platform/manualReply";
 
 const originalWebSocket = Tools.window.WebSocket as typeof WebSocket;
 const TARGET_URL: string = 'chat';
@@ -241,10 +242,12 @@ setReceiveInterceptor((data) => {
         `messageType=${wsData.messages[0].type ?? "unknown"}`,
         `bodyType=${wsData.messages[0].body?.type ?? "unknown"}`
     ].join(";");
-    if (pageUid === fromUid) {
+    if (String(pageUid) === String(fromUid)) {
         logger.debug("接收到自己的消息='" + msgBody + "'")
         return data;
     }
+
+    if (manualReplyMode) return data;
 
     if (!userStore) {
         userStore = UserStore();

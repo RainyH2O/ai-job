@@ -14,7 +14,8 @@ let matchUrlList: string[] = [
 // https://vitejs.dev/config/
 // https://github.com/lisonge/vite-plugin-monkey
 export default defineConfig(({mode}) => {
-    const isProduction = mode === 'production';
+    const isBundle = mode === 'bundle';
+    const scriptFileName = isBundle ? 'ai-job-hunting.bundle.user.js' : 'ai-job-hunting.user.js';
 
     const plugins = [
         vue({
@@ -32,18 +33,20 @@ export default defineConfig(({mode}) => {
             userscript: {
                 name: "AI工作猎手-让ai帮您找工作！",
                 author: "maple.",
-                version: '0.0.27-beta',
+                version: '0.0.29-beta',
                 license: 'Apache License 2.0',
                 icon: 'https://raw.githubusercontent.com/RainyH2O/ai-job/custom/file/icon.png',
                 description: "找工作，用AI工作猎手！让AI帮您找工作！ai坐席：【DeepSeek+ChatGpt】赋能，ai助理作为您的求职者分身24小时 * 7在线找工作，并结合您的简历信息定制化回复。批量投递，自动发送简历，交换联系方式。hr拒绝挽留。高意向邮件通知，让您不错过每一份工作机会。BOSS直聘",
                 namespace: 'https://github.com/yangfeng20',
                 connect: ["docdownload.zhipin.com"],
-                updateURL: "https://raw.githubusercontent.com/RainyH2O/ai-job/custom/ai-job-hunting.user.js",
-                downloadURL: "https://raw.githubusercontent.com/RainyH2O/ai-job/custom/ai-job-hunting.user.js",
+                updateURL: `https://raw.githubusercontent.com/RainyH2O/ai-job/custom/${scriptFileName}`,
+                downloadURL: `https://raw.githubusercontent.com/RainyH2O/ai-job/custom/${scriptFileName}`,
                 match: matchUrlList,
             },
             build: {
-                externalGlobals: {
+                fileName: scriptFileName,
+                systemjs: isBundle ? 'inline' : undefined,
+                externalGlobals: isBundle ? {} : {
                     vue: cdn.jsdelivr('Vue', 'dist/vue.global.prod.js')
                         .concat('https://unpkg.com/vue-demi@latest/lib/index.iife.js')
                         .concat(util.dataUrl(";window.Vue=Vue;")),
@@ -52,7 +55,7 @@ export default defineConfig(({mode}) => {
                     pinia: cdn.jsdelivr("Pinia", "dist/pinia.iife.prod.js"),
                     "event-source-polyfill": cdn.jsdelivr("EventSourcePolyfill", "src/eventsource.min.js"),
                 },
-                externalResource: {
+                externalResource: isBundle ? {} : {
                     "element-plus/dist/index.css": cdn.jsdelivr(),
                     "element-plus/theme-chalk/dark/css-vars.css": cdn.jsdelivr(),
                 },

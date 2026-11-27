@@ -72,7 +72,7 @@ public class JobSeekerClonedService {
         Long userId = HeaderContext.getHeader().getUserId();
 
         // 停止会话
-        if (msgSessionService.msgSessionStop(jobKey)) {
+        if (msgSessionService.msgSessionStop(jobKey, jobSeekerClonedParam.isManualReply())) {
             return new JobSeekerClonedResultVO(JobSeekerClonedAnswerTypeEnum.STOP, "");
         }
         // 重复问题过滤

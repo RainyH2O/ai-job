@@ -50,6 +50,10 @@ public class MsgSessionService {
 
 
     public boolean msgSessionStop(String jobKey) {
+        return msgSessionStop(jobKey, false);
+    }
+
+    public boolean msgSessionStop(String jobKey, boolean manualReply) {
         if (globalStop) {
             return true;
         }
@@ -59,11 +63,13 @@ public class MsgSessionService {
             return false;
         }
 
-        Long userId = HeaderContext.getHeader().getUserId();
-        UserInfoDO userInfoDO = userInfoMapper.selectById(userId);
-        // 用户全局停止时，停止会话
-        if (!AiSeatStatusEnum.OPEN.getCode().equals(userInfoDO.getAiSeatStatus())) {
-            return true;
+        if (!manualReply) {
+            Long userId = HeaderContext.getHeader().getUserId();
+            UserInfoDO userInfoDO = userInfoMapper.selectById(userId);
+            // 用户全局停止时，停止会话
+            if (!AiSeatStatusEnum.OPEN.getCode().equals(userInfoDO.getAiSeatStatus())) {
+                return true;
+            }
         }
 
         Boolean isStop = msgSessionStopCache.get(jobKey);
@@ -84,6 +90,11 @@ public class MsgSessionService {
     public boolean setMsgSessionStop(String jobKey, Boolean isStop) {
         if ("globalJobKey".equals(jobKey)) {
             globalStop = isStop;
+            return true;
+        }
+
+        if (Boolean.FALSE.equals(isStop)) {
+            return msgSessionStopCache.set(jobKey, false);
         }
 
 

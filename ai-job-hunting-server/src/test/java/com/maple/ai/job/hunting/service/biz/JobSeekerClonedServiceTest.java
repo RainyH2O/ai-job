@@ -79,6 +79,18 @@ class JobSeekerClonedServiceTest {
     }
 
     @Test
+    void identifiesManualRepliesExplicitlyWhenCheckingSessionStops() {
+        JobSeekerClonedParam request = new JobSeekerClonedParam("hello", "job-1", null);
+        request.setManualReply(true);
+        when(aiServiceFacade.sessionChat("session-1", "hello"))
+                .thenReturn(new ChatSessionResult("session-1", "COMMAND_NO_REPLY"));
+
+        service.ask(request);
+
+        verify(msgSessionService).msgSessionStop("job-1", true);
+    }
+
+    @Test
     void answersTheNextMessageAfterSkippingOneMessage() {
         when(aiServiceFacade.sessionChat("session-1", "好的"))
                 .thenReturn(new ChatSessionResult("session-1", "COMMAND_NO_REPLY"));

@@ -1,8 +1,8 @@
-import {ElMessageBox, ElNotification} from 'element-plus';
+import {ElMessageBox, ElNotification, ElMessage} from 'element-plus';
 import logger from '../logging';
 
 export function showReplyReview(contactName: string, question: string, draft: string,
-                                onConfirm: (reply: string) => void): void {
+                                onConfirm: (reply: string) => void | boolean | Promise<void | boolean>): void {
     let reviewing = false;
     let sent = false;
     const notice = ElNotification({
@@ -23,9 +23,12 @@ export function showReplyReview(contactName: string, question: string, draft: st
                     cancelButtonText: '暂不发送',
                     closeOnClickModal: false,
                 });
+                if (await onConfirm(value.trim()) === false) {
+                    ElMessage({type: 'warning', message: '会话已有新消息或你已回复，旧草稿未发送，请重新处理。'});
+                    return;
+                }
                 sent = true;
                 notice.close();
-                onConfirm(value.trim());
             } catch (action) {
                 if (action !== 'cancel' && action !== 'close') {
                     logger.error('人工审阅回复失败', action);

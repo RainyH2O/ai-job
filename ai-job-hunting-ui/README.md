@@ -96,7 +96,7 @@
 ### 常用命令
 *   **安装依赖**：`pnpm install`
 *   **开发模式**：`pnpm run dev` (启动 Vite 开发服务器，在浏览器中通过油猴安装开发版脚本)
-*   **生产构建**：`pnpm run build` (生成的脚本位于 `dist/ai-job-hunting.user.js`)
+*   **生产构建**：`pnpm run build` (生成普通版 `dist/ai-job-hunting.user.js` 和完整依赖版 `dist/ai-job-hunting.bundle.user.js`，并自动同步到仓库根目录供安装和更新)
 
 ## 开发约定 (Development Conventions)
 

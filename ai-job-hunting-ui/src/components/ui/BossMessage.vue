@@ -1,6 +1,8 @@
 <template>
     <br/>
-    <el-button style="margin-left: 10px;" type="success" @click="handlerClick">重启当前会话AI坐席</el-button>
+    <el-button style="margin-left: 10px;" type="success" :loading="resuming" :disabled="replying || batchReplying" @click="resumeCurrentChat">重新启用当前会话AI坐席</el-button>
+    <el-button style="margin-left: 10px;" type="success" :loading="replying" :disabled="resuming || batchReplying" @click="replyCurrentChat">AI 回复最后一条</el-button>
+    <span style="margin-left: 10px;">{{ replyProgress }}</span>
     
     <!-- 批量发送悬浮框（自定义非遮罩，不阻塞背景点击） -->
     <div v-if="batchSendDialogVisible" class="batch-send-float">
@@ -18,12 +20,100 @@
 </template>
 
 <script setup lang="ts">
-import {AiPower} from "../../platform/aiPower";
 import {ElMessage} from "../../utils/tools";
-import {BossOption} from "../../platform/bossPlatform";
-import {ref} from "vue";
+import {ref, onUnmounted} from "vue";
 import {Message} from "../../webSocket/protobuf";
 import {Tools} from "../../platform/utils";
+import {getPendingConversations, getSelectedConversation, replyToConversation} from "../../platform/bossManualReply";
+import {canReplyToConversation} from "../../platform/manualReply";
+import {AiPower} from "../../platform/aiPower";
+import {BossOption} from "../../platform/bossPlatform";
+
+const resuming = ref(false)
+const replying = ref(false)
+const batchReplying = ref(false)
+const replyProgress = ref('手动模式：收到新消息不会自动回复')
+
+const resumeCurrentChat = async () => {
+    if (resuming.value || replying.value || batchReplying.value) return
+    const source = getSelectedConversation()
+    if (!source) {
+        ElMessage({type: 'info', message: '请先打开一个聊天窗口'})
+        return
+    }
+    resuming.value = true
+    try {
+        await AiPower.updateAskStatus(BossOption.buildJobKey(source as any), false)
+        ElMessage({type: 'success', message: '已重新启用当前会话 AI 坐席；手动模式仍需点击触发回复'})
+    } catch (error: any) {
+        ElMessage({type: 'error', message: error?.message || String(error)})
+    } finally {
+        resuming.value = false
+    }
+}
+
+const replyCurrentChat = async () => {
+    if (resuming.value || replying.value || batchReplying.value) return
+    const source = getSelectedConversation()
+    if (!source) {
+        ElMessage({type: 'info', message: '请先打开一个聊天窗口'})
+        return
+    }
+    if (!canReplyToConversation(source)) {
+        ElMessage({type: 'info', message: '最后一条不是可处理的对方消息，已跳过'})
+        return
+    }
+    replying.value = true
+    replyProgress.value = '正在处理当前会话…'
+    try {
+        const result = await replyToConversation(source)
+        replyProgress.value = result === 'processed' ? 'AI 已处理；如需审核，请查看审核弹窗' : '已跳过：消息已处理、已变化或不支持该消息类型'
+    } catch (error: any) {
+        replyProgress.value = '处理失败，可以重试'
+        ElMessage({type: 'error', message: error?.message || String(error)})
+    } finally {
+        replying.value = false
+    }
+}
+
+const replyAllChats = async () => {
+    if (resuming.value || replying.value || batchReplying.value) return
+    const sources = getPendingConversations()
+    batchReplying.value = true
+    let processed = 0, skipped = 0, failed = 0
+    let lastError = ''
+    try {
+        for (let index = 0; index < sources.length; index++) {
+            replyProgress.value = `批量处理中 ${index + 1}/${sources.length}`
+            try {
+                if (await replyToConversation(sources[index]) === 'processed') processed++
+                else skipped++
+            } catch (error: any) {
+                failed++
+                lastError = error?.message || String(error)
+            }
+        }
+        replyProgress.value = `批量完成：处理 ${processed}，跳过 ${skipped}，失败 ${failed}（仅已加载的会话）`
+            + (lastError ? `；最后错误：${lastError}` : '')
+    } finally {
+        batchReplying.value = false
+    }
+}
+
+const checkAndCreateAIReplyButton = () => {
+    const batchSendButton = document.querySelector('.batch-send-btn')
+    if (!batchSendButton?.parentElement) return
+    let button = batchSendButton.parentElement.querySelector<HTMLButtonElement>('.ai-manual-reply-btn')
+    if (!button) {
+        button = document.createElement('button')
+        button.className = 'ai-manual-reply-btn'
+        button.style.cssText = 'margin:10px 4px;padding:8px;background:#409eff;color:white;border:0;border-radius:4px;cursor:pointer;'
+        button.addEventListener('click', replyAllChats)
+    }
+    if (batchSendButton.nextElementSibling !== button) batchSendButton.after(button)
+    button.disabled = resuming.value || replying.value || batchReplying.value
+    button.textContent = batchReplying.value ? '批量 AI 回复中…' : '批量 AI 回复'
+}
 
 // 批量发送相关状态
 const batchSendDialogVisible = ref(false)
@@ -166,31 +256,17 @@ const sendBatchMessage = () => {
     cleanupBatchUI()
 }
 
-setInterval(()=>{
+const buttonTimer = setInterval(()=>{
     checkAndCreateBatchSendButton()
+    checkAndCreateAIReplyButton()
 }, 1000)
 
-const handlerClick = () => {
-
-    const element = document.querySelector('.friend-content.selected') as any;
-    const encryptJobId = element?.parentElement?.__vue__?.source?.encryptJobId;
-    if (!encryptJobId) {
-        ElMessage({
-            type: 'info',
-            message: '请先进入聊天窗口'
-        })
-        return;
-    }
-
-    const jobKey = BossOption.buildJobKey({encryptJobId: encryptJobId} as any);
-
-    AiPower.updateAskStatus(jobKey, false).then(_ => {
-        ElMessage({
-            type: 'success',
-            message: '已重新触发AI坐席'
-        })
-    })
-}
+onUnmounted(() => {
+    clearInterval(buttonTimer)
+    document.querySelector('.ai-manual-reply-btn')?.remove()
+    document.querySelector('.batch-send-btn')?.remove()
+    cleanupBatchUI()
+})
 
 </script>
 

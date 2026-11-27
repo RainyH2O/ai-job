@@ -247,26 +247,27 @@ export class BossOption {
             .replace(/{{assistant_avatar}}/g, BossOption.aiIconWebpBase64)
     }
 
-    public async handlerBossMessage(msgObj: TechwolfChatProtocol, bossId: number, text: string, diagnosticInfo?: string): Promise<void> {
+    public async handlerBossMessage(msgObj: TechwolfChatProtocol, bossId: number, text: string, diagnosticInfo?: string, canReply?: () => boolean): Promise<boolean> {
         if (userStore.user.preference.drE && userStore.user.preference.dr > 0) {
             // 延迟回复
             await Tools.sleep(userStore.user.preference.dr * 1000 + Tools.getRandomNumber(0, 300))
         }
-        if (BossOption.messageCache.isMessageProcessed(bossId, text)) {
+        if (canReply && !canReply()) return false;
+        if (!canReply && BossOption.messageCache.isMessageProcessed(bossId, text)) {
             logging.trace("【跳过重复消息】:", bossId, text);
-            return;
+            return false;
         }
         // 标记消息已处理， 由于下面的代码是异步的，最后执行标记操作还是可能重复处理消息
-        BossOption.messageCache.markMessageAsProcessed(bossId, text)
+        if (!canReply) BossOption.messageCache.markMessageAsProcessed(bossId, text)
 
         // 用户ai坐席未开启
-        if (!userStore.user.aiSeatStatus) {
+        if (!canReply && !userStore.user.aiSeatStatus) {
             logger.info("AI坐席未开启，不处理消息")
-            return;
+            return false;
         }
 
         if (!this.preHandlerMsgByMsgType(msgObj, text)) {
-            return;
+            return false;
         }
 
         const bossUserInfo = await this.getBossUserInfoByBossId(bossId);
@@ -274,26 +275,28 @@ export class BossOption {
             const bodyType = msgObj.messages[0].body.type;
             // 15 => 过滤活动通知
             if (bodyType === 15) {
-                return;
+                return false;
             }
             BossOption.logRecorder.error("【处理Boss消息-失败】无法获取联系人信息", text)
-            return;
+            return false;
         }
 
         if (!this.preHandlerMsgByBodyType(msgObj, bossUserInfo, text)) {
-            return;
+            return false;
         }
         logger.debug("接收消息解码内容：", text)
 
         const jobKey = BossOption.buildJobKey(bossUserInfo);
-        return AiPower.ask(text, jobKey, bossUserInfo, diagnosticInfo).then(resp => {
+        if (canReply && !canReply()) return false;
+        return AiPower.ask(text, jobKey, bossUserInfo, diagnosticInfo, !!canReply).then(async resp => {
+            if (canReply && !canReply()) return false;
             let data = resp.data.data;
             let answerTypeList: Number[] = data?.answerTypeList;
 
             // 停止交互
             if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.STOP)) {
                 logging.info("【处理Boss消息-忽略】停止交互")
-                return Promise.resolve();
+                return false;
             }
             // ai服务异常
             if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.AI_SERVICE_EXCEPTION)) {
@@ -302,24 +305,23 @@ export class BossOption {
                     type: 'error',
                     message: 'AI服务异常，暂时无法处理消息（请联系管理员处理）',
                 })
-                return Promise.resolve();
+                return false;
             }
 
             if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.REVIEW_REQUIRED)) {
-                showReplyReview(msgObj.messages[0]?.from?.name || '招聘联系人', text, data.answerContent || '', reply => {
-                    this.sendMsg(bossId, reply + Tools.getEndChar(), undefined, undefined);
-                });
-                return;
+                showReplyReview(msgObj.messages[0]?.from?.name || '招聘联系人', text, data.answerContent || '',
+                    reply => this.sendMsg(bossId, reply + Tools.getEndChar(), undefined, undefined, canReply));
+                return true;
             }
 
             // 文本回复
             if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.MSG_TEXT) && data.answerContent?.trim()) {
                 const html = this.buildNoticeHtml(msgObj.messages[0]?.from?.name, msgObj.messages[0]?.from?.avatar, text, data.answerContent)
-                this.sendMsg(bossId, data.answerContent + Tools.getEndChar(), undefined, html)
+                if (!await this.sendMsg(bossId, data.answerContent + Tools.getEndChar(), undefined, html, canReply)) return false;
             }
             // boss操作
             if (answerTypeList.includes(JobSeekerClonedAnswerTypeEnum.BOSS_OPERATION)) {
-                data?.operationTypeList?.includes(BossOperationTypeEnum.SEND_RESUME)
+                if (data?.operationTypeList?.includes(BossOperationTypeEnum.SEND_RESUME))
                 {
                     this.sendResumeFile(bossId).then(_ => {
                     })
@@ -343,17 +345,19 @@ export class BossOption {
                         })
                     })
             }, 500)
+            return true;
         })
     }
 
     public sendMsg(bossId: number, msg: string, image: {
         originImage: string,
         tinyImage: string
-    } | undefined, html?: string): void {
-        this.getBossUserInfoByBossId(bossId).then((bossUserInfo: BossUserInfo | undefined) => {
+    } | undefined, html?: string, canReply?: () => boolean): Promise<boolean> {
+        return this.getBossUserInfoByBossId(bossId).then((bossUserInfo: BossUserInfo | undefined) => {
+            if (canReply && !canReply()) return false;
             if (!bossUserInfo) {
                 BossOption.logRecorder.error("发送消息失败，联系人信息获取失败");
-                return;
+                return false;
             }
 
             // 构建消息并发送
@@ -376,6 +380,7 @@ export class BossOption {
                     message: html,
                 })
             }
+            return true;
         })
     }
 
